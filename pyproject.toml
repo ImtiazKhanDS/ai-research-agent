@@ -1,0 +1,20 @@
+[project]
+name = "ai-research-agent"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "arxiv>=3.0.0",
+    "openai>=2.32.0",
+    "python-dotenv>=1.2.2",
+    "requests>=2.33.1",
+    "tavily-python>=0.7.23",
+    "tweepy>=4.16.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+    "pytest-cov>=7.1.0",
+]
