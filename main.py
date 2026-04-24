@@ -14,6 +14,12 @@ def main() -> None:
         choices=["api", "local"],
         help="Override LLM_MODE: 'api' = Groq, 'local' = Ollama (default: from .env)",
     )
+    parser.add_argument(
+        "--topic",
+        type=str,
+        default=None,
+        help="Research a specific topic instead of general AI news (e.g. 'mixture of experts', 'AI agents')",
+    )
     args = parser.parse_args()
 
     # Override LLM_MODE before any agent imports read it
@@ -23,7 +29,7 @@ def main() -> None:
     _check_env()
 
     from agents.orchestrator import run
-    run(verbose=args.verbose)
+    run(verbose=args.verbose, topic=args.topic)
 
 
 def _check_env() -> None:

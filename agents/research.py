@@ -6,11 +6,61 @@ from tools.web_search import web_search_tool, run_web_search
 from tools.arxiv_search import arxiv_search_tool, run_arxiv_search
 
 TOOLS = [web_search_tool, arxiv_search_tool]
+MAX_TOOL_RESULT_CHARS = 1500  # keeps each tool result ~375 tokens
 
 TOOL_HANDLERS = {
     "web_search": run_web_search,
     "arxiv_search": run_arxiv_search,
 }
+
+TOPIC_RESEARCH_PROMPT = """You are an AI research analyst. Today's date is {today} ({weekday}).
+
+The user wants a deep-dive research brief on this specific topic: "{topic}"
+
+Search comprehensively across all the sources below — prioritise quality and depth over breadth. Do NOT limit to last 24 hours; include the best recent content available on this topic.
+
+Sources to prioritise:
+- Research & Papers: arXiv cs.AI / cs.LG / cs.CL, Papers With Code, Semantic Scholar
+- Newsletters & Blogs: The Rundown AI, The Batch, Lilian Weng's Blog, The AI Edge, Hugging Face Blog
+- News: TechCrunch AI, VentureBeat AI
+- Company blogs: Anthropic, OpenAI, Google DeepMind, Meta AI
+- Community: r/MachineLearning, Hacker News
+
+Run ALL of the following searches:
+1. "{topic} latest research 2025 OR 2026"
+2. "{topic} site:arxiv.org"
+3. "{topic} site:huggingface.co"
+4. "{topic} site:paperswithcode.com"
+5. "{topic} site:venturebeat.com OR site:techcrunch.com"
+6. "{topic} Hacker News OR r/MachineLearning"
+7. "{topic} OpenAI OR Anthropic OR Google DeepMind OR Meta AI"
+8. "{topic} benchmark OR evaluation OR state of the art"
+
+arXiv searches:
+9. arxiv_search: "{topic}"
+10. arxiv_search: "{topic} survey"
+
+After gathering results, produce a structured research brief:
+
+# Topic Research Brief: {topic} — {today}
+
+## What Is It / Current State
+[Clear explanation of the topic and where it stands today technically]
+
+## Key Developments & Papers
+For each item (aim for 5):
+### [Title]
+- **Why it matters**: [technical significance]
+- **Key finding / contribution**: [specifics — numbers, methods, claims]
+- **Source/URL**: [url]
+
+## Open Problems & Debates
+[2-3 bullet points on what's unsolved, contested, or actively being worked on]
+
+## Signal: Where This Is Heading
+[2-3 bullet points on the technical trajectory — what the research suggests about the next 6-12 months]
+
+Be specific. Name models, papers, authors, benchmarks, and numbers."""
 
 RESEARCH_PROMPT = """You are an AI research analyst. Today's date is {today} ({weekday}).
 
@@ -71,13 +121,16 @@ Additional stories and papers worth knowing about (aim for 3-4 items).
 Be specific. Avoid vague summaries — name the models, the numbers, the claims, the researchers."""
 
 
-def run_research_agent(verbose: bool = False) -> str:
+def run_research_agent(verbose: bool = False, topic: str | None = None) -> str:
     now = datetime.now()
     today = now.strftime("%Y-%m-%d")
     yesterday = (now - timedelta(days=1)).strftime("%Y-%m-%d")
     weekday = now.strftime("%A")
 
-    prompt = RESEARCH_PROMPT.format(today=today, yesterday=yesterday, weekday=weekday)
+    if topic:
+        prompt = TOPIC_RESEARCH_PROMPT.format(topic=topic, today=today, weekday=weekday)
+    else:
+        prompt = RESEARCH_PROMPT.format(today=today, yesterday=yesterday, weekday=weekday)
     messages = [{"role": "user", "content": prompt}]
     tools_were_called = False
 
@@ -118,6 +171,10 @@ def run_research_agent(verbose: bool = False) -> str:
                     result = handler(**fn_args)
                 except Exception as e:
                     result = f"Tool error: {e}"
+
+            # Truncate to keep context size manageable across many tool calls
+            if len(result) > MAX_TOOL_RESULT_CHARS:
+                result = result[:MAX_TOOL_RESULT_CHARS] + "\n...[truncated]"
 
             messages.append({
                 "role": "tool",

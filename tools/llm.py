@@ -1,5 +1,6 @@
 import os
-from openai import OpenAI
+import sys
+from openai import OpenAI, APIStatusError
 
 # LLM_MODE=api   → Groq (default)
 # LLM_MODE=local → Ollama (gemma4:e2b)
@@ -22,7 +23,16 @@ def complete(messages: list, tools: list | None = None, tool_choice: str | None 
     if tools:
         kwargs["tools"] = tools
         kwargs["tool_choice"] = tool_choice or "auto"
-    return client.chat.completions.create(**kwargs)
+    try:
+        return client.chat.completions.create(**kwargs)
+    except APIStatusError as e:
+        if e.status_code == 413:
+            print(f"\n  [!] Request too large for model '{model}' (413).")
+            print(f"      This model has a low token limit. Switch to a higher-limit model.")
+            print(f"      Recommended: set GROQ_MODEL=llama-3.3-70b-versatile in your .env")
+            print(f"      Or run with: GROQ_MODEL=llama-3.3-70b-versatile uv run python main.py")
+            sys.exit(1)
+        raise
 
 
 def current_provider() -> str:
